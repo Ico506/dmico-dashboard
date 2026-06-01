@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DMICO — Crypto Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c0f;--bg2:#111417;--bg3:#181c21;--bg4:#1f2429;
+  --border:#2a2f36;--border2:#333a42;
+  --text:#e8eaed;--text2:#8a9099;--text3:#555d66;
+  --teal:#1fd99a;--teal-dim:#0f6e4e;--teal-bg:#0a1f17;
+  --amber:#f0a030;--amber-dim:#7a4f10;--amber-bg:#1f1508;
+  --red:#e85555;--red-dim:#7a2020;--red-bg:#1f0a0a;
+  --purple:#9b8df5;--purple-dim:#4a3d99;--purple-bg:#0f0d1f;
+  --blue:#4da6ff;--blue-bg:#0a1520;
+  --radius:8px;--radius-lg:12px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
+.mono{font-family:'DM Mono',monospace}
+nav{position:sticky;top:0;z-index:100;background:rgba(10,12,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;gap:12px;flex-wrap:wrap}
+.nav-brand{display:flex;align-items:center;gap:10px}
+.nav-logo{width:30px;height:30px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav-title{font-size:15px;font-weight:600;letter-spacing:0.02em}
+.nav-sub{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.nav-tabs{display:flex;gap:4px}
+.nav-tab{padding:6px 16px;border-radius:6px;border:none;background:transparent;color:var(--text2);font-size:13px;font-family:'Syne',sans-serif;cursor:pointer;transition:all 0.15s;font-weight:500}
+.nav-tab:hover{color:var(--text);background:var(--bg3)}
+.nav-tab.active{color:var(--teal);background:var(--teal-bg)}
+.nav-right{display:flex;align-items:center;gap:12px}
+.nav-usdmyr{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.nav-usdmyr label{font-family:'DM Mono',monospace}
+.nav-usdmyr input{width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace;padding:4px 8px;text-align:center}
+.nav-usdmyr input:focus{outline:none;border-color:var(--teal)}
+.db-status{font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:5px}
+.db-status.ok{background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-dim)}
+.db-status.err{background:var(--red-bg);color:var(--red);border:1px solid var(--red-dim)}
+.db-status.loading{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.page{display:none;padding:2rem;max-width:900px;margin:0 auto;animation:fadeIn 0.2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem}
+.sec{font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);margin:1.5rem 0 0.75rem;font-family:'DM Mono',monospace}
+.sec:first-child{margin-top:0}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.5rem}
+.metric{background:var(--bg3);border-radius:var(--radius);padding:1rem}
+.metric-val{font-size:22px;font-weight:600;font-family:'DM Mono',monospace}
+.metric-lbl{font-size:11px;color:var(--text2);margin-top:4px;font-family:'DM Mono',monospace}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-grid.three{grid-template-columns:1fr 1fr 1fr}
+.form-grid.single{grid-template-columns:1fr}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text3);font-family:'DM Mono',monospace}
+.field input,.field select{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:13px;font-family:'DM Mono',monospace;padding:9px 12px;transition:border-color 0.15s;width:100%}
+.field input:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(31,217,154,0.1)}
+.field select option{background:var(--bg3)}
+.btn{padding:10px 20px;border-radius:var(--radius);border:none;font-size:13px;font-family:'Syne',sans-serif;font-weight:600;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:8px}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-primary{background:var(--teal);color:#000}
+.btn-primary:hover:not(:disabled){background:#25f0ad}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg3);color:var(--text);border-color:var(--border2)}
+.btn-danger{background:transparent;color:var(--red);border:1px solid var(--red-dim)}
+.btn-danger:hover{background:var(--red-bg)}
+.btn-full{width:100%;justify-content:center}
+.style-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.style-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:'Syne',sans-serif;cursor:pointer;transition:all 0.15s}
+.style-btn:hover{border-color:var(--border2);color:var(--text)}
+.style-btn.active{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-dim)}
+.target-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1.5rem}
+.tcard{border-radius:var(--radius);padding:14px}
+.tcard.entry{background:var(--bg3);border:1px solid var(--border)}
+.tcard.sell{background:var(--amber-bg);border:1px solid var(--amber-dim)}
+.tcard.rebuy{background:var(--teal-bg);border:1px solid var(--teal-dim)}
+.tcard.stop{background:var(--red-bg);border:1px solid var(--red-dim)}
+.tcard-lbl{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;font-family:'DM Mono',monospace}
+.tcard.entry .tcard-lbl{color:var(--text3)}
+.tcard.sell .tcard-lbl{color:var(--amber)}
+.tcard.rebuy .tcard-lbl{color:var(--teal)}
+.tcard.stop .tcard-lbl{color:var(--red)}
+.tcard-price{font-size:20px;font-weight:600;font-family:'DM Mono',monospace}
+.tcard.entry .tcard-price{color:var(--text)}
+.tcard.sell .tcard-price{color:var(--amber)}
+.tcard.rebuy .tcard-price{color:var(--teal)}
+.tcard.stop .tcard-price{color:var(--red)}
+.tcard-myr{font-size:11px;color:var(--text2);margin-top:2px;font-family:'DM Mono',monospace}
+.tcard-note{font-size:11px;margin-top:8px;line-height:1.4}
+.tcard.entry .tcard-note{color:var(--text2)}
+.tcard.sell .tcard-note{color:#c47a20}
+.tcard.rebuy .tcard-note{color:#0d9e6e}
+.tcard.stop .tcard-note{color:#b03030}
+.gain-box{background:var(--teal-bg);border:1px solid var(--teal-dim);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;gap:20px;flex-wrap:wrap}
+.gain-stat .val{font-size:20px;font-weight:600;font-family:'DM Mono',monospace;color:var(--teal)}
+.gain-stat .lbl{font-size:11px;color:#0d9e6e;margin-top:2px;font-family:'DM Mono',monospace}
+.action-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:1.5rem}
+.action-table th{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace}
+.action-table td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top;font-size:12px;font-family:'DM Mono',monospace;color:var(--text2)}
+.action-table td:first-child{color:var(--text)}
+.action-table tr:last-child td{border-bottom:none}
+.phase{font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;letter-spacing:0.06em;font-family:'DM Mono',monospace;display:inline-block}
+.ph-buy{background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-dim)}
+.ph-hold{background:var(--bg4);color:var(--text2);border:1px solid var(--border)}
+.ph-sell{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-dim)}
+.ph-rebuy{background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-dim)}
+.warn-box{border-radius:var(--radius);padding:12px 16px;margin-bottom:1.5rem;font-size:12px;line-height:1.7;font-family:'DM Mono',monospace;display:flex;gap:10px;align-items:flex-start}
+.warn-box.amber{background:var(--amber-bg);border:1px solid var(--amber-dim);color:var(--amber)}
+.warn-box.red{background:var(--red-bg);border:1px solid var(--red-dim);color:var(--red)}
+.rules-list{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.rule-item{border-bottom:1px solid var(--border)}
+.rule-item:last-child{border-bottom:none}
+.rule-toggle{width:100%;background:transparent;border:none;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;font-weight:500;text-align:left;transition:background 0.15s}
+.rule-toggle:hover{background:var(--bg3)}
+.rule-toggle-left{display:flex;align-items:center;gap:10px;color:var(--text2)}
+.rule-chev{font-size:14px;transition:transform 0.2s;color:var(--text3)}
+.rule-body{display:none;padding:0 16px 14px;font-size:12px;color:var(--text2);line-height:1.7;font-family:'DM Mono',monospace}
+.rule-body.open{display:block}
+.portfolio-empty{text-align:center;padding:3rem;color:var(--text3)}
+.portfolio-empty .icon{font-size:40px;margin-bottom:12px}
+.holding-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:12px;transition:background 0.1s}
+.holding-row:hover{background:var(--bg3)}
+.holding-row:last-child{border-bottom:none}
+.holding-header{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:12px;padding:8px 16px;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);background:var(--bg3)}
+.holding-name{font-weight:500;font-family:'Syne',sans-serif;color:var(--text)}
+.holding-ticker{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
+.pnl-pos{color:var(--teal)}
+.pnl-neg{color:var(--red)}
+.pnl-neu{color:var(--text2)}
+.del-btn{background:transparent;border:none;color:var(--text3);cursor:pointer;padding:4px 6px;border-radius:4px;transition:all 0.15s;font-size:14px}
+.del-btn:hover{color:var(--red);background:var(--red-bg)}
+.portfolio-total{background:var(--bg4);border-top:2px solid var(--border2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;font-family:'DM Mono',monospace;font-size:13px;border-radius:0 0 var(--radius-lg) var(--radius-lg)}
+.add-form{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.5rem}
+.divider{height:1px;background:var(--border);margin:1.5rem 0}
+.toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:var(--radius);font-size:13px;font-family:'DM Mono',monospace;z-index:999;animation:slideUp 0.2s ease;pointer-events:none}
+.toast.ok{background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-dim)}
+.toast.err{background:var(--red-bg);color:var(--red);border:1px solid var(--red-dim)}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;border-top:1px solid var(--border);margin-top:2rem}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr}
+  .form-grid.three{grid-template-columns:1fr 1fr}
+  nav{height:auto;padding:0.75rem 1rem}
+  .holding-row,.holding-header{grid-template-columns:2fr 1fr 1fr auto;font-size:11px}
+  .holding-row .hide-sm,.holding-header .hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">🎩</div>
+    <div>
+      <div class="nav-title">DMICO</div>
+      <div class="nav-sub">crypto dashboard</div>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('swing',this)">⚡ Swing Calc</button>
+    <button class="nav-tab" onclick="showPage('portfolio',this)">📊 Portfolio</button>
+  </div>
+  <div class="nav-right">
+    <div class="db-status loading" id="db-status"><div class="dot"></div><span>connecting...</span></div>
+    <div class="nav-usdmyr">
+      <label>USD/MYR</label>
+      <input type="number" id="usdmyr-global" value="4.45" step="0.01" min="1" onchange="refreshPortfolio()"/>
+    </div>
+  </div>
+</nav>
+
+<!-- SWING PAGE -->
+<div class="page active" id="page-swing">
+  <div class="sec">Swing calculator</div>
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="form-grid">
+      <div class="field">
+        <label>Crypto</label>
+        <select id="sc-crypto">
+          <option value="INJ">Injective (INJ)</option>
+          <option value="ONDO">Ondo Finance (ONDO)</option>
+          <option value="ATOM">Cosmos (ATOM)</option>
+          <option value="XRP">XRP</option>
+          <option value="BTC">Bitcoin (BTC)</option>
+          <option value="ETH">Ethereum (ETH)</option>
+          <option value="SOL">Solana (SOL)</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Buy price (USD)</label>
+        <input type="number" id="sc-buy" placeholder="e.g. 4.50" step="any" min="0"/>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Amount invested (RM)</label>
+        <input type="number" id="sc-amount" placeholder="e.g. 80" step="any" min="0"/>
+      </div>
+      <div class="field">
+        <label>Current price (USD) — optional</label>
+        <input type="number" id="sc-current" placeholder="e.g. 5.61" step="any" min="0"/>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div class="sec" style="margin-top:0">Swing style</div>
+      <div class="style-row">
+        <button class="style-btn" onclick="setSC('conservative',this)">Conservative — trim 30%</button>
+        <button class="style-btn active" onclick="setSC('balanced',this)">Balanced — trim 50%</button>
+        <button class="style-btn" onclick="setSC('aggressive',this)">Aggressive — trim 70%</button>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="calcSwing()">⚡ Calculate swing targets</button>
+  </div>
+
+  <div id="sc-results" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:15px;font-weight:600" id="sc-result-title"></div>
+        <div style="font-size:12px;color:var(--text2);font-family:'DM Mono',monospace" id="sc-result-sub"></div>
+      </div>
+      <button class="btn btn-ghost" onclick="resetSwing()" style="font-size:12px;padding:6px 14px">↺ Reset</button>
+    </div>
+    <div class="target-grid" id="sc-targets"></div>
+    <div class="gain-box" id="sc-gain"></div>
+    <div class="sec">Step-by-step cycle</div>
+    <table class="action-table">
+      <thead><tr><th>Phase</th><th>Action</th><th>Price</th><th>Outcome</th></tr></thead>
+      <tbody id="sc-steps"></tbody>
+    </table>
+    <div class="warn-box amber" id="sc-warn" style="display:none">
+      <span style="font-size:16px;flex-shrink:0">⚠</span>
+      <span id="sc-warn-text"></span>
+    </div>
+    <div class="sec">Rulebook — tap to expand</div>
+    <div class="rules-list" id="sc-rules"></div>
+  </div>
+</div>
+
+<!-- PORTFOLIO PAGE -->
+<div class="page" id="page-portfolio">
+  <div class="sec">Add holding</div>
+  <div class="add-form">
+    <div class="form-grid three">
+      <div class="field">
+        <label>Crypto</label>
+        <select id="pt-crypto">
+          <option value="BTC">Bitcoin (BTC)</option>
+          <option value="ETH">Ethereum (ETH)</option>
+          <option value="XRP">XRP</option>
+          <option value="ATOM">Cosmos (ATOM)</option>
+          <option value="SOL">Solana (SOL)</option>
+          <option value="INJ">Injective (INJ)</option>
+          <option value="ONDO">Ondo Finance (ONDO)</option>
+          <option value="LDO">Lido DAO (LDO)</option>
+          <option value="RNDR">Render (RNDR)</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ticker (if other)</label>
+        <input type="text" id="pt-ticker" placeholder="e.g. PEPE" maxlength="10"/>
+      </div>
+      <div class="field">
+        <label>Tokens held</label>
+        <input type="number" id="pt-tokens" placeholder="e.g. 8" step="any" min="0"/>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Avg buy price (USD)</label>
+        <input type="number" id="pt-buy" placeholder="e.g. 4.50" step="any" min="0"/>
+      </div>
+      <div class="field">
+        <label>Current price (USD)</label>
+        <input type="number" id="pt-current" placeholder="e.g. 5.61" step="any" min="0"/>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Label / note (optional)</label>
+        <input type="text" id="pt-note" placeholder="e.g. staked on Luno, DCA position"/>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn btn-primary btn-full" id="add-btn" onclick="addHolding()">＋ Add to portfolio</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">Portfolio summary</div>
+  <div class="metric-grid">
+    <div class="metric"><div class="metric-val" id="pt-total-myr">RM0</div><div class="metric-lbl">Total value</div></div>
+    <div class="metric"><div class="metric-val" id="pt-invested-myr">RM0</div><div class="metric-lbl">Total invested</div></div>
+    <div class="metric"><div class="metric-val pnl-neu" id="pt-pnl-myr">RM0</div><div class="metric-lbl">Unrealised P&L</div></div>
+    <div class="metric"><div class="metric-val pnl-neu" id="pt-pnl-pct">0.00%</div><div class="metric-lbl">Overall return</div></div>
+  </div>
+
+  <div class="sec">Holdings</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden" id="pt-table-wrap">
+    <div class="portfolio-empty" id="pt-empty">
+      <div class="icon">📊</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:6px">No holdings yet</div>
+      <div style="font-size:12px;color:var(--text3);font-family:'DM Mono',monospace">Add your first crypto holding above</div>
+    </div>
+    <div id="pt-table" style="display:none">
+      <div class="holding-header">
+        <div>Asset</div><div>Tokens</div><div>Value (RM)</div>
+        <div class="hide-sm">Invested (RM)</div><div class="hide-sm">P&L</div><div></div>
+      </div>
+      <div id="pt-rows"></div>
+      <div class="portfolio-total">
+        <span style="color:var(--text2)">Total portfolio</span>
+        <span style="font-weight:600" id="pt-footer-total">RM0.00</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="sec">Monthly DCA plan</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:8px;letter-spacing:0.06em;text-transform:uppercase">Injective (INJ)</div>
+        <div style="font-size:20px;font-weight:600;font-family:'DM Mono',monospace;color:var(--purple)">RM80</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">~3 INJ/month · Luno Exchange</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:8px;letter-spacing:0.06em;text-transform:uppercase">Cosmos (ATOM)</div>
+        <div style="font-size:20px;font-weight:600;font-family:'DM Mono',monospace;color:var(--teal)">RM80</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">~8 ATOM/month · stake after</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:8px;letter-spacing:0.06em;text-transform:uppercase">Ondo Finance (ONDO)</div>
+        <div style="font-size:20px;font-weight:600;font-family:'DM Mono',monospace;color:var(--amber)">RM40</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">~22 ONDO/month · conservative</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:8px;letter-spacing:0.06em;text-transform:uppercase">ASM (TNG GoInvest)</div>
+        <div style="font-size:20px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text2)">RM0*</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">*add when budget opens</div>
+      </div>
+    </div>
+    <div style="margin-top:1rem;padding:10px 14px;background:var(--teal-bg);border:1px solid var(--teal-dim);border-radius:var(--radius);font-size:12px;color:var(--teal);font-family:'DM Mono',monospace;line-height:1.6">
+      📅 DCA rule — buy the same RM amount on a fixed date every month, regardless of price. Consistency beats timing.
+    </div>
+  </div>
+
+  <div style="margin-top:1rem;text-align:right">
+    <button class="btn btn-danger" onclick="clearAll()" style="font-size:12px;padding:6px 14px">🗑 Clear all holdings</button>
+  </div>
+</div>
+
+<footer>DMICO · Damico's personal crypto dashboard · Cloud sync via Supabase · Not financial advice</footer>
+
+<script>
+const SUPABASE_URL = 'https://cfhynsinazwyeabhtteh.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmaHluc2luYXp3eWVhYmh0dGVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTc4MjksImV4cCI6MjA5NTg5MzgyOX0.so0FrkL2_21NDn5xrc7KPZqkfhzGIjgIMi7uJp0ihcM';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const USDMYR = () => parseFloat(document.getElementById('usdmyr-global').value) || 4.45;
+
+function setDbStatus(state, msg) {
+  const el = document.getElementById('db-status');
+  el.className = 'db-status ' + state;
+  el.innerHTML = '<div class="dot"></div><span>' + msg + '</span>';
+}
+
+function showToast(msg, type='ok') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'portfolio') refreshPortfolio();
+}
+
+// SWING CALC
+let scStyle = 'balanced', scTrimPct = 0.5;
+const scProfiles = {
+  INJ:  {name:'Injective',    sellM:[1.20,1.25,1.30],rebuyM:[0.78,0.72,0.68],stopM:0.70,note:'INJ is volatile — watch for 20–30% pumps. Key catalysts: weekly buyback burns, potential spot ETF. Buy zone: $2.70–$4.50.'},
+  ONDO: {name:'Ondo Finance', sellM:[1.35,1.40,1.50],rebuyM:[0.72,0.68,0.65],stopM:0.65,note:'ONDO moves slower — wait for 35–50% moves. Watch H2 2026 fee switch governance vote as major catalyst. Range: $0.20–$0.60.'},
+  ATOM: {name:'Cosmos',       sellM:[1.20,1.25,1.30],rebuyM:[0.80,0.75,0.70],stopM:0.72,warn:true,note:'ATOM CAUTION: You stake ATOM with a 21-day unbonding period. Only swing UNSTAKED ATOM. Swinging staked ATOM means a 21-day exit window — price can move massively in that time.'},
+  XRP:  {name:'XRP',          sellM:[1.20,1.25,1.30],rebuyM:[0.82,0.78,0.74],stopM:0.75,note:'XRP major catalysts (SEC case, ETF) have played out. Swings are slower — use 20–25% conservative targets. Your entry at $0.20 is already deep in profit.'},
+  BTC:  {name:'Bitcoin',      sellM:[1.12,1.15,1.18],rebuyM:[0.90,0.87,0.84],stopM:0.82,note:'BTC swings are smaller (10–15%). Most stable base asset — swing conservatively. Never swing more than 20% of your BTC position.'},
+  ETH:  {name:'Ethereum',     sellM:[1.15,1.18,1.22],rebuyM:[0.88,0.84,0.80],stopM:0.78,note:'ETH is your base layer. Swing small portions only. Long-term ETH staking thesis means holding long has its own yield via Lido.'},
+  SOL:  {name:'Solana',       sellM:[1.22,1.28,1.35],rebuyM:[0.78,0.72,0.68],stopM:0.68,note:'SOL is moderately volatile with a strong ecosystem. Swings of 20–35% are realistic. Watch Solana ecosystem announcements.'},
+  OTHER:{name:'Custom crypto', sellM:[1.25,1.30,1.40],rebuyM:[0.78,0.72,0.68],stopM:0.65,note:'Unknown volatility profile. Use conservative targets. Size swing at 30% max until you understand how this asset moves.'},
+};
+const scSI = {conservative:0,balanced:1,aggressive:2};
+const scTrimPcts = {conservative:0.30,balanced:0.50,aggressive:0.70};
+const scStyleNames = {conservative:'conservative — trim 30%',balanced:'balanced — trim 50%',aggressive:'aggressive — trim 70%'};
+function setSC(s,btn){scStyle=s;scTrimPct=scTrimPcts[s];document.querySelectorAll('.style-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}
+function fmt(n,d=2){return'$'+parseFloat(n).toFixed(d)}
+function fmtRM(n){return'RM'+parseFloat(n).toFixed(2)}
+function pct(n){return(n>=0?'+':'')+((n)*100).toFixed(1)+'%'}
+
+function calcSwing(){
+  const ticker=document.getElementById('sc-crypto').value;
+  const buy=parseFloat(document.getElementById('sc-buy').value);
+  const amtRM=parseFloat(document.getElementById('sc-amount').value);
+  const curr=parseFloat(document.getElementById('sc-current').value)||null;
+  if(!buy||buy<=0||!amtRM||amtRM<=0){alert('Please enter a valid buy price and amount.');return}
+  const r=USDMYR(),p=scProfiles[ticker],si=scSI[scStyle];
+  const buyMYR=buy*r,tokens=amtRM/buyMYR;
+  const sellP=buy*p.sellM[si],rebuyP=buy*p.rebuyM[si],stopP=buy*p.stopM;
+  const sellMYR=sellP*r,rebuyMYR=rebuyP*r,stopMYR=stopP*r;
+  const sellTok=tokens*scTrimPct,keptTok=tokens*(1-scTrimPct);
+  const cashRM=sellTok*sellMYR,rebuyTok=cashRM/rebuyMYR;
+  const totalTok=keptTok+rebuyTok,extra=totalTok-tokens,gainPct=totalTok/tokens-1;
+  const fee=(amtRM*0.0025)+(cashRM*0.0025);
+  document.getElementById('sc-result-title').textContent=p.name+' — '+scStyleNames[scStyle];
+  const currStr=curr?` · current ${fmt(curr)} (${pct(curr/buy-1)})`:'';
+  document.getElementById('sc-result-sub').textContent=`Entry ${fmt(buy)} · ${tokens.toFixed(2)} tokens · invested ${fmtRM(amtRM)}`+currStr;
+  document.getElementById('sc-targets').innerHTML=`
+    <div class="tcard entry"><div class="tcard-lbl">Your entry</div><div class="tcard-price">${fmt(buy)}</div><div class="tcard-myr">${fmtRM(buyMYR)} per token</div><div class="tcard-note">${tokens.toFixed(2)} tokens · ${fmtRM(amtRM)} invested</div></div>
+    <div class="tcard sell"><div class="tcard-lbl">Sell ${Math.round(scTrimPct*100)}% here</div><div class="tcard-price">${fmt(sellP)}</div><div class="tcard-myr">${fmtRM(sellMYR)} · ${pct(p.sellM[si]-1)} from entry</div><div class="tcard-note">Sell ${sellTok.toFixed(2)} tokens → get ${fmtRM(cashRM)}</div></div>
+    <div class="tcard rebuy"><div class="tcard-lbl">Rebuy dip here</div><div class="tcard-price">${fmt(rebuyP)}</div><div class="tcard-myr">${fmtRM(rebuyMYR)} · ${pct(p.rebuyM[si]-1)} from entry</div><div class="tcard-note">Redeploy ${fmtRM(cashRM)} → ${rebuyTok.toFixed(2)} tokens</div></div>
+    <div class="tcard stop"><div class="tcard-lbl">Stop-loss level</div><div class="tcard-price">${fmt(stopP)}</div><div class="tcard-myr">${fmtRM(stopMYR)} · reassess thesis</div><div class="tcard-note">Do not average down past here without strong conviction</div></div>`;
+  document.getElementById('sc-gain').innerHTML=`
+    <div class="gain-stat"><div class="val">${totalTok.toFixed(2)}</div><div class="lbl">tokens after full cycle</div></div>
+    <div class="gain-stat"><div class="val">+${extra.toFixed(2)}</div><div class="lbl">extra ${ticker} gained</div></div>
+    <div class="gain-stat"><div class="val">${pct(gainPct)}</div><div class="lbl">token accumulation gain</div></div>
+    <div class="gain-stat"><div class="val" style="color:var(--amber)">${fmtRM(fee)}</div><div class="lbl">est. Luno fees (0.25%×2)</div></div>`;
+  document.getElementById('sc-steps').innerHTML=`
+    <tr><td><span class="phase ph-buy">BUY</span></td><td>Already in — bought at ${fmt(buy)}</td><td>${fmt(buy)} / ${fmtRM(buyMYR)}</td><td>Holding ${tokens.toFixed(2)} ${ticker}</td></tr>
+    <tr><td><span class="phase ph-hold">HOLD</span></td><td>Set Luno alert at ${fmt(sellP)}. Live your life.</td><td>${fmt(buy)} → ${fmt(sellP)}</td><td>Unrealised gain building</td></tr>
+    <tr><td><span class="phase ph-sell">SELL</span></td><td>Alert fires → sell ${sellTok.toFixed(2)} ${ticker} via Luno Exchange (limit order)</td><td>${fmt(sellP)} / ${fmtRM(sellMYR)}</td><td>${fmtRM(cashRM)} cash + ${keptTok.toFixed(2)} ${ticker} kept</td></tr>
+    <tr><td><span class="phase ph-hold">WAIT</span></td><td>Set rebuy alert at ${fmt(rebuyP)}. Cash sits idle — that's fine.</td><td>${fmt(sellP)} → ${fmt(rebuyP)}</td><td>${fmtRM(cashRM)} ready to deploy</td></tr>
+    <tr><td><span class="phase ph-rebuy">REBUY</span></td><td>Alert fires → deploy ${fmtRM(cashRM)} into ${ticker} (limit order)</td><td>${fmt(rebuyP)} / ${fmtRM(rebuyMYR)}</td><td>Now ${totalTok.toFixed(2)} ${ticker} — ${pct(gainPct)} more tokens</td></tr>`;
+  const w=document.getElementById('sc-warn');
+  if(p.note){w.style.display='flex';document.getElementById('sc-warn-text').textContent=p.note;w.className='warn-box '+(p.warn?'red':'amber')}else{w.style.display='none'}
+  const rules=[
+    {t:'Only trim, never fully exit',b:`You sold ${Math.round(scTrimPct*100)}% — ${keptTok.toFixed(2)} ${ticker} stays in your wallet. If price keeps running you still profit. If it drops your cash reloads cheaper.`},
+    {t:'Use price alerts, not chart watching',b:`Set Luno alerts at ${fmt(sellP)} (sell) and ${fmt(rebuyP)} (rebuy). Check once a day max. Watching charts every hour leads to emotional trades.`},
+    {t:'Keep your monthly DCA going',b:`Your monthly DCA (RM80 INJ, RM80 ATOM, RM40 ONDO) continues every month regardless of swings. Swinging is on top of regular DCA, never instead of it.`},
+    {t:'Measure success in tokens, not ringgit',b:`After this cycle: ${totalTok.toFixed(2)} ${ticker} vs ${tokens.toFixed(2)} at start. That's ${pct(gainPct)} more tokens for zero extra capital.`},
+    {t:'Cash can wait — weeks if needed',b:`Your ${fmtRM(cashRM)} from the sell sits in Luno. Do not force a rebuy. Wait for ${fmt(rebuyP)} to genuinely arrive.`},
+  ];
+  document.getElementById('sc-rules').innerHTML=rules.map((r,i)=>`
+    <div class="rule-item">
+      <button class="rule-toggle" onclick="toggleRule(${i})">
+        <div class="rule-toggle-left">📌 ${r.t}</div>
+        <div class="rule-chev" id="rchev-${i}">▾</div>
+      </button>
+      <div class="rule-body" id="rbody-${i}">${r.b}</div>
+    </div>`).join('');
+  document.getElementById('sc-results').style.display='block';
+  document.getElementById('sc-results').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function toggleRule(i){const b=document.getElementById('rbody-'+i),c=document.getElementById('rchev-'+i);b.classList.toggle('open');c.style.transform=b.classList.contains('open')?'rotate(180deg)':'rotate(0deg)'}
+function resetSwing(){document.getElementById('sc-results').style.display='none';['sc-buy','sc-amount','sc-current'].forEach(id=>document.getElementById(id).value='')}
+
+// PORTFOLIO — Supabase
+const cryptoNames = {BTC:'Bitcoin',ETH:'Ethereum',XRP:'XRP',ATOM:'Cosmos',SOL:'Solana',INJ:'Injective',ONDO:'Ondo Finance',LDO:'Lido DAO',RNDR:'Render'};
+
+async function addHolding(){
+  const crypto=document.getElementById('pt-crypto').value;
+  const tickerInput=document.getElementById('pt-ticker').value.trim().toUpperCase();
+  const ticker=crypto==='OTHER'?(tickerInput||'???'):crypto;
+  const tokens=parseFloat(document.getElementById('pt-tokens').value);
+  const buy=parseFloat(document.getElementById('pt-buy').value);
+  const current=parseFloat(document.getElementById('pt-current').value);
+  const note=document.getElementById('pt-note').value.trim();
+  if(!tokens||tokens<=0||!buy||buy<=0||!current||current<=0){alert('Please fill in tokens, buy price, and current price.');return}
+  const btn=document.getElementById('add-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Saving...';
+  const {error}=await sb.from('holdings').insert({
+    ticker,name:cryptoNames[crypto]||ticker,tokens,buy_price:buy,
+    current_price:current,note:note||null,
+    added_date:new Date().toLocaleDateString('en-MY')
+  });
+  btn.disabled=false;btn.innerHTML='＋ Add to portfolio';
+  if(error){showToast('Error: '+error.message,'err');return}
+  showToast('✓ Holding saved to cloud');
+  ['pt-tokens','pt-buy','pt-current','pt-note','pt-ticker'].forEach(id=>document.getElementById(id).value='');
+  refreshPortfolio();
+}
+
+async function removeHolding(id){
+  const {error}=await sb.from('holdings').delete().eq('id',id);
+  if(error){showToast('Error deleting: '+error.message,'err');return}
+  showToast('Holding removed');
+  refreshPortfolio();
+}
+
+async function clearAll(){
+  if(!confirm('Clear all holdings from the cloud database? This cannot be undone.'))return;
+  const {error}=await sb.from('holdings').delete().neq('id',0);
+  if(error){showToast('Error: '+error.message,'err');return}
+  showToast('All holdings cleared');
+  refreshPortfolio();
+}
+
+async function refreshPortfolio(){
+  const r=USDMYR();
+  const {data,error}=await sb.from('holdings').select('*').order('created_at',{ascending:true});
+  if(error){setDbStatus('err','db error');return}
+  setDbStatus('ok','cloud sync ✓');
+  const holdings=data||[];
+  let totalVal=0,totalInvest=0;
+  const rows=holdings.map(h=>{
+    const val=h.tokens*h.current_price*r;
+    const invest=h.tokens*h.buy_price*r;
+    const pnl=val-invest;
+    const pnlPct=(h.current_price/h.buy_price-1)*100;
+    totalVal+=val;totalInvest+=invest;
+    const cls=pnl>=0?'pnl-pos':'pnl-neg';
+    const sign=pnl>=0?'+':'';
+    return`<div class="holding-row">
+      <div><div class="holding-name">${h.ticker}</div><div class="holding-ticker">${h.name}${h.note?' · '+h.note:''} · ${h.added_date||''}</div></div>
+      <div class="mono">${parseFloat(h.tokens).toFixed(4)}</div>
+      <div class="mono">${fmtRM(val)}</div>
+      <div class="mono hide-sm">${fmtRM(invest)}</div>
+      <div class="mono hide-sm ${cls}">${sign}${fmtRM(Math.abs(pnl))}<br><span style="font-size:10px">${sign}${pnlPct.toFixed(1)}%</span></div>
+      <div><button class="del-btn" onclick="removeHolding(${h.id})">✕</button></div>
+    </div>`;
+  });
+  const totalPNL=totalVal-totalInvest;
+  const totalPNLPct=totalInvest>0?(totalVal/totalInvest-1)*100:0;
+  const pnlClass=totalPNL>=0?'pnl-pos':'pnl-neg';
+  const sign=totalPNL>=0?'+':'';
+  document.getElementById('pt-total-myr').textContent=fmtRM(totalVal);
+  document.getElementById('pt-invested-myr').textContent=fmtRM(totalInvest);
+  document.getElementById('pt-pnl-myr').textContent=sign+fmtRM(Math.abs(totalPNL));
+  document.getElementById('pt-pnl-myr').className='metric-val '+pnlClass;
+  document.getElementById('pt-pnl-pct').textContent=sign+totalPNLPct.toFixed(2)+'%';
+  document.getElementById('pt-pnl-pct').className='metric-val '+pnlClass;
+  if(holdings.length===0){
+    document.getElementById('pt-empty').style.display='block';
+    document.getElementById('pt-table').style.display='none';
+  } else {
+    document.getElementById('pt-empty').style.display='none';
+    document.getElementById('pt-table').style.display='block';
+    document.getElementById('pt-rows').innerHTML=rows.join('');
+    document.getElementById('pt-footer-total').textContent=fmtRM(totalVal);
+  }
+}
+
+// Init
+(async()=>{
+  setDbStatus('loading','connecting...');
+  const {error}=await sb.from('holdings').select('id').limit(1);
+  if(error){setDbStatus('err','db offline');showToast('Cannot reach database. Check connection.','err')}
+  else{setDbStatus('ok','cloud sync ✓')}
+})();
+</script>
+</body>
+</html>
