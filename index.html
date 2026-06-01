@@ -297,21 +297,13 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
         <input type="number" id="pt-tokens" placeholder="e.g. 8.00" step="any" min="0"/>
       </div>
       <div class="field">
-        <label id="pt-buy-label">Price paid per token (USD)</label>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input type="number" id="pt-buy" placeholder="e.g. 4.50" step="any" min="0" style="flex:1"/>
-          <div class="cur-toggle">
-            <button class="cur-btn active" id="pt-buy-usd" onclick="ptBuyCur('usd')">USD</button>
-            <button class="cur-btn" id="pt-buy-myr" onclick="ptBuyCur('myr')">MYR</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="form-grid">
-      <div class="field">
         <label>Total spent (RM) — from Luno receipt</label>
         <input type="number" id="pt-spent" placeholder="e.g. 80.00" step="any" min="0"/>
       </div>
+    </div>
+    <div class="form-grid">
+      <div class="field" style="display:none"><input type="number" id="pt-buy" value="0"/></div>
+      <div class="field">
       <div class="field">
         <label id="pt-cur-label">Current price (USD)</label>
         <div style="display:flex;gap:6px;align-items:center">
@@ -540,16 +532,15 @@ async function addTrade(){
   const name=cryptoNames[crypto]||ticker;
   const date=document.getElementById('pt-date').value;
   const tokens=parseFloat(document.getElementById('pt-tokens').value);
-  const buyRaw=parseFloat(document.getElementById('pt-buy').value);
   const spentRaw=parseFloat(document.getElementById('pt-spent').value);
   const currentRaw=parseFloat(document.getElementById('pt-current').value);
   const note=document.getElementById('pt-note').value.trim();
-  if(!tokens||tokens<=0||!buyRaw||buyRaw<=0||!currentRaw||currentRaw<=0||!date){
-    alert('Please fill in date, tokens, price paid, and current price.');return;
+  if(!tokens||tokens<=0||!spentRaw||spentRaw<=0||!currentRaw||currentRaw<=0||!date){
+    alert('Please fill in date, tokens, total spent, and current price.');return;
   }
-  const buyUSD=toUSD(buyRaw,ptBuyCurrency);
+  const totalRM=spentRaw;
+  const buyUSD=totalRM/(tokens*USDMYR());
   const currentUSD=toUSD(currentRaw,ptCurCurrency);
-  const totalRM=spentRaw>0?spentRaw:parseFloat((tokens*buyUSD*USDMYR()).toFixed(2));
   const btn=document.getElementById('add-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Saving...';
   const {error}=await sb.from('trades').insert({
@@ -559,7 +550,7 @@ async function addTrade(){
   btn.disabled=false;btn.innerHTML='+ Log this buy';
   if(error){showToast('Error: '+error.message,'err');return}
   showToast('Trade logged to cloud');
-  ['pt-tokens','pt-buy','pt-spent','pt-current','pt-note','pt-ticker'].forEach(id=>document.getElementById(id).value='');
+  ['pt-tokens','pt-spent','pt-current','pt-note','pt-ticker'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pt-date').value=new Date().toISOString().split('T')[0];
   refreshPortfolio();
 }
