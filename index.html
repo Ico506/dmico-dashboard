@@ -352,6 +352,25 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
     </div>
   </div>
 
+  <div class="sec" style="margin-top:1.5rem">Trade history</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem" id="trades-wrap">
+    <div class="portfolio-empty" id="trades-empty">
+      <div class="icon" style="font-size:28px">📋</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">No trades logged yet</div>
+      <div style="font-size:12px;color:var(--text3);font-family:'DM Mono',monospace">Your individual buy entries will appear here</div>
+    </div>
+    <div id="trades-table" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:10px;padding:8px 16px;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);background:var(--bg3)">
+        <div>Date</div><div>Coin</div><div>Tokens</div><div>Price paid</div><div>Total (RM)</div><div></div>
+      </div>
+      <div id="trades-rows"></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:1rem;text-align:right">
+    <button class="btn btn-danger" onclick="clearAll()" style="font-size:12px;padding:6px 14px">🗑 Clear all trades</button>
+  </div>
+
   <div class="divider"></div>
   <div class="sec">Monthly DCA plan</div>
   <div class="card">
@@ -382,9 +401,6 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
     </div>
   </div>
 
-  <div style="margin-top:1rem;text-align:right">
-    <button class="btn btn-danger" onclick="clearAll()" style="font-size:12px;padding:6px 14px">🗑 Clear all holdings</button>
-  </div>
 </div>
 
 <footer>DMICO · Damico's personal crypto dashboard · Cloud sync via Supabase · Not financial advice</footer>
@@ -496,94 +512,127 @@ function calcSwing(){
 function toggleRule(i){const b=document.getElementById('rbody-'+i),c=document.getElementById('rchev-'+i);b.classList.toggle('open');c.style.transform=b.classList.contains('open')?'rotate(180deg)':'rotate(0deg)'}
 function resetSwing(){document.getElementById('sc-results').style.display='none';['sc-buy','sc-amount','sc-current'].forEach(id=>document.getElementById(id).value='')}
 
-// PORTFOLIO — Supabase
+// PORTFOLIO — Trade log system
 const cryptoNames = {BTC:'Bitcoin',ETH:'Ethereum',XRP:'XRP',ATOM:'Cosmos',SOL:'Solana',INJ:'Injective',ONDO:'Ondo Finance',LDO:'Lido DAO',RNDR:'Render'};
 
-async function addHolding(){
+document.addEventListener('DOMContentLoaded',()=>{
+  const d=document.getElementById('pt-date');
+  if(d) d.value=new Date().toISOString().split('T')[0];
+});
+
+async function addTrade(){
   const crypto=document.getElementById('pt-crypto').value;
   const tickerInput=document.getElementById('pt-ticker').value.trim().toUpperCase();
   const ticker=crypto==='OTHER'?(tickerInput||'???'):crypto;
+  const name=cryptoNames[crypto]||ticker;
+  const date=document.getElementById('pt-date').value;
   const tokens=parseFloat(document.getElementById('pt-tokens').value);
   const buyRaw=parseFloat(document.getElementById('pt-buy').value);
+  const spentRaw=parseFloat(document.getElementById('pt-spent').value);
   const currentRaw=parseFloat(document.getElementById('pt-current').value);
-  const buy=toUSD(buyRaw,ptBuyCurrency);
-  const current=toUSD(currentRaw,ptCurCurrency);
   const note=document.getElementById('pt-note').value.trim();
-  if(!tokens||tokens<=0||!buy||buy<=0||!current||current<=0){alert('Please fill in tokens, buy price, and current price.');return}
+  if(!tokens||tokens<=0||!buyRaw||buyRaw<=0||!currentRaw||currentRaw<=0||!date){
+    alert('Please fill in date, tokens, price paid, and current price.');return;
+  }
+  const buyUSD=toUSD(buyRaw,ptBuyCurrency);
+  const currentUSD=toUSD(currentRaw,ptCurCurrency);
+  const totalRM=spentRaw>0?spentRaw:parseFloat((tokens*buyUSD*USDMYR()).toFixed(2));
   const btn=document.getElementById('add-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Saving...';
-  const {error}=await sb.from('holdings').insert({
-    ticker,name:cryptoNames[crypto]||ticker,tokens,buy_price:buy,
-    current_price:current,note:note||null,
-    added_date:new Date().toLocaleDateString('en-MY')
+  const {error}=await sb.from('trades').insert({
+    ticker,name,date,tokens,buy_price_usd:buyUSD,
+    total_spent_rm:totalRM,current_price_usd:currentUSD,note:note||null
   });
-  btn.disabled=false;btn.innerHTML='＋ Add to portfolio';
+  btn.disabled=false;btn.innerHTML='+ Log this buy';
   if(error){showToast('Error: '+error.message,'err');return}
-  showToast('✓ Holding saved to cloud');
-  ['pt-tokens','pt-buy','pt-current','pt-note','pt-ticker'].forEach(id=>document.getElementById(id).value='');
+  showToast('Trade logged to cloud');
+  ['pt-tokens','pt-buy','pt-spent','pt-current','pt-note','pt-ticker'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pt-date').value=new Date().toISOString().split('T')[0];
   refreshPortfolio();
 }
 
-async function removeHolding(id){
-  const {error}=await sb.from('holdings').delete().eq('id',id);
-  if(error){showToast('Error deleting: '+error.message,'err');return}
-  showToast('Holding removed');
+async function removeTrade(id){
+  const {error}=await sb.from('trades').delete().eq('id',id);
+  if(error){showToast('Error: '+error.message,'err');return}
+  showToast('Trade removed');
   refreshPortfolio();
 }
 
 async function clearAll(){
-  if(!confirm('Clear all holdings from the cloud database? This cannot be undone.'))return;
-  const {error}=await sb.from('holdings').delete().neq('id',0);
+  if(!confirm('Clear ALL trades from the database? This cannot be undone.'))return;
+  const {error}=await sb.from('trades').delete().neq('id',0);
   if(error){showToast('Error: '+error.message,'err');return}
-  showToast('All holdings cleared');
+  showToast('All trades cleared');
   refreshPortfolio();
 }
 
 async function refreshPortfolio(){
   const r=USDMYR();
-  const {data,error}=await sb.from('holdings').select('*').order('created_at',{ascending:true});
+  const {data,error}=await sb.from('trades').select('*').order('date',{ascending:true});
   if(error){setDbStatus('err','db error');return}
-  setDbStatus('ok','cloud sync ✓');
-  const holdings=data||[];
+  setDbStatus('ok','cloud sync');
+  const trades=data||[];
+  const grouped={};
+  trades.forEach(t=>{
+    if(!grouped[t.ticker])grouped[t.ticker]={ticker:t.ticker,name:t.name,totalTokens:0,totalSpentRM:0,latestCurrentUSD:parseFloat(t.current_price_usd)};
+    grouped[t.ticker].totalTokens+=parseFloat(t.tokens);
+    grouped[t.ticker].totalSpentRM+=parseFloat(t.total_spent_rm);
+    grouped[t.ticker].latestCurrentUSD=parseFloat(t.current_price_usd);
+  });
   let totalVal=0,totalInvest=0;
-  const rows=holdings.map(h=>{
-    const val=h.tokens*h.current_price*r;
-    const invest=h.tokens*h.buy_price*r;
-    const pnl=val-invest;
-    const pnlPct=(h.current_price/h.buy_price-1)*100;
-    totalVal+=val;totalInvest+=invest;
+  const holdingRows=Object.values(grouped).map(h=>{
+    const avgBuyUSD=h.totalSpentRM/(h.totalTokens*r);
+    const currentVal=h.totalTokens*h.latestCurrentUSD*r;
+    const pnl=currentVal-h.totalSpentRM;
+    const pnlPct=(currentVal/h.totalSpentRM-1)*100;
+    totalVal+=currentVal;totalInvest+=h.totalSpentRM;
     const cls=pnl>=0?'pnl-pos':'pnl-neg';
     const sign=pnl>=0?'+':'';
     return`<div class="holding-row">
-      <div><div class="holding-name">${h.ticker}</div><div class="holding-ticker">${h.name}${h.note?' · '+h.note:''} · ${h.added_date||''}</div></div>
-      <div class="mono">${parseFloat(h.tokens).toFixed(4)}</div>
-      <div class="mono">${fmtRM(val)}</div>
-      <div class="mono hide-sm">${fmtRM(invest)}</div>
+      <div><div class="holding-name">${h.ticker}</div><div class="holding-ticker">${h.name} · avg buy $${avgBuyUSD.toFixed(3)}</div></div>
+      <div class="mono">${h.totalTokens.toFixed(4)}</div>
+      <div class="mono">${fmtRM(currentVal)}</div>
+      <div class="mono hide-sm">${fmtRM(h.totalSpentRM)}</div>
       <div class="mono hide-sm ${cls}">${sign}${fmtRM(Math.abs(pnl))}<br><span style="font-size:10px">${sign}${pnlPct.toFixed(1)}%</span></div>
-      <div><button class="del-btn" onclick="removeHolding(${h.id})">✕</button></div>
+      <div></div>
     </div>`;
   });
   const totalPNL=totalVal-totalInvest;
   const totalPNLPct=totalInvest>0?(totalVal/totalInvest-1)*100:0;
   const pnlClass=totalPNL>=0?'pnl-pos':'pnl-neg';
-  const sign=totalPNL>=0?'+':'';
+  const sign2=totalPNL>=0?'+':'';
   document.getElementById('pt-total-myr').textContent=fmtRM(totalVal);
   document.getElementById('pt-invested-myr').textContent=fmtRM(totalInvest);
-  document.getElementById('pt-pnl-myr').textContent=sign+fmtRM(Math.abs(totalPNL));
+  document.getElementById('pt-pnl-myr').textContent=sign2+fmtRM(Math.abs(totalPNL));
   document.getElementById('pt-pnl-myr').className='metric-val '+pnlClass;
-  document.getElementById('pt-pnl-pct').textContent=sign+totalPNLPct.toFixed(2)+'%';
+  document.getElementById('pt-pnl-pct').textContent=sign2+totalPNLPct.toFixed(2)+'%';
   document.getElementById('pt-pnl-pct').className='metric-val '+pnlClass;
-  if(holdings.length===0){
+  if(Object.keys(grouped).length===0){
     document.getElementById('pt-empty').style.display='block';
     document.getElementById('pt-table').style.display='none';
-  } else {
+  }else{
     document.getElementById('pt-empty').style.display='none';
     document.getElementById('pt-table').style.display='block';
-    document.getElementById('pt-rows').innerHTML=rows.join('');
+    document.getElementById('pt-rows').innerHTML=holdingRows.join('');
     document.getElementById('pt-footer-total').textContent=fmtRM(totalVal);
   }
+  if(trades.length===0){
+    document.getElementById('trades-empty').style.display='block';
+    document.getElementById('trades-table').style.display='none';
+  }else{
+    document.getElementById('trades-empty').style.display='none';
+    document.getElementById('trades-table').style.display='block';
+    document.getElementById('trades-rows').innerHTML=trades.slice().reverse().map(t=>`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+        <div>${t.date}</div>
+        <div style="color:var(--text);font-weight:500">${t.ticker}<br><span style="font-size:10px;color:var(--text3);font-weight:400">${t.note||'no note'}</span></div>
+        <div>${parseFloat(t.tokens).toFixed(4)}</div>
+        <div>$${parseFloat(t.buy_price_usd).toFixed(3)}<br><span style="font-size:10px;color:var(--text3)">${fmtRM(parseFloat(t.buy_price_usd)*r)}</span></div>
+        <div style="color:var(--teal)">${fmtRM(parseFloat(t.total_spent_rm))}</div>
+        <div><button class="del-btn" onclick="removeTrade(${t.id})" title="Remove">x</button></div>
+      </div>`).join('');
+  }
 }
-
 
 // Currency toggle state
 let scBuyCurrency='usd', scCurCurrency='usd', ptBuyCurrency='usd', ptCurCurrency='usd';
