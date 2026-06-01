@@ -264,7 +264,7 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
 
 <!-- PORTFOLIO PAGE -->
 <div class="page" id="page-portfolio">
-  <div class="sec">Add holding</div>
+  <div class="sec">Log a buy</div>
   <div class="add-form">
     <div class="form-grid three">
       <div class="field">
@@ -283,17 +283,21 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
         </select>
       </div>
       <div class="field">
-        <label>Ticker (if other)</label>
+        <label>Ticker (if Other)</label>
         <input type="text" id="pt-ticker" placeholder="e.g. PEPE" maxlength="10"/>
       </div>
       <div class="field">
-        <label>Tokens held</label>
-        <input type="number" id="pt-tokens" placeholder="e.g. 8" step="any" min="0"/>
+        <label>Date of purchase</label>
+        <input type="date" id="pt-date"/>
       </div>
     </div>
     <div class="form-grid">
       <div class="field">
-        <label id="pt-buy-label">Avg buy price (USD)</label>
+        <label>Tokens bought</label>
+        <input type="number" id="pt-tokens" placeholder="e.g. 8.00" step="any" min="0"/>
+      </div>
+      <div class="field">
+        <label id="pt-buy-label">Price paid per token (USD)</label>
         <div style="display:flex;gap:6px;align-items:center">
           <input type="number" id="pt-buy" placeholder="e.g. 4.50" step="any" min="0" style="flex:1"/>
           <div class="cur-toggle">
@@ -301,6 +305,12 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
             <button class="cur-btn" id="pt-buy-myr" onclick="ptBuyCur('myr')">MYR</button>
           </div>
         </div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Total spent (RM) — from Luno receipt</label>
+        <input type="number" id="pt-spent" placeholder="e.g. 80.00" step="any" min="0"/>
       </div>
       <div class="field">
         <label id="pt-cur-label">Current price (USD)</label>
@@ -315,12 +325,15 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
     </div>
     <div class="form-grid">
       <div class="field">
-        <label>Label / note (optional)</label>
-        <input type="text" id="pt-note" placeholder="e.g. staked on Luno, DCA position"/>
+        <label>Notes (optional)</label>
+        <input type="text" id="pt-note" placeholder="e.g. DCA buy, swing rebuy, first purchase"/>
       </div>
       <div style="display:flex;align-items:flex-end">
-        <button class="btn btn-primary btn-full" id="add-btn" onclick="addHolding()">＋ Add to portfolio</button>
+        <button class="btn btn-primary btn-full" id="add-btn" onclick="addTrade()">＋ Log this buy</button>
       </div>
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;background:var(--teal-bg);border:1px solid var(--teal-dim);border-radius:var(--radius);font-size:11px;color:var(--teal);font-family:'DM Mono',monospace">
+      💡 Open Luno → Transaction history → tap the buy → copy tokens, price paid, and total spent directly into here
     </div>
   </div>
 
