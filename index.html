@@ -42,6 +42,9 @@ nav{position:sticky;top:0;z-index:100;background:rgba(10,12,15,0.92);backdrop-fi
 .db-status.err{background:var(--red-bg);color:var(--red);border:1px solid var(--red-dim)}
 .db-status.loading{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
 .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.cur-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0}
+.cur-btn{padding:4px 10px;font-size:11px;font-family:'DM Mono',monospace;background:transparent;color:var(--text3);border:none;cursor:pointer;transition:all 0.15s}
+.cur-btn.active{background:var(--teal-bg);color:var(--teal)}
 .page{display:none;padding:2rem;max-width:900px;margin:0 auto;animation:fadeIn 0.2s ease}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -198,8 +201,14 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
         </select>
       </div>
       <div class="field">
-        <label>Buy price (USD)</label>
-        <input type="number" id="sc-buy" placeholder="e.g. 4.50" step="any" min="0"/>
+        <label id="sc-buy-label">Buy price (USD)</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="sc-buy" placeholder="e.g. 4.50" step="any" min="0" style="flex:1"/>
+          <div class="cur-toggle">
+            <button class="cur-btn active" id="sc-buy-usd" onclick="scBuyCur('usd')">USD</button>
+            <button class="cur-btn" id="sc-buy-myr" onclick="scBuyCur('myr')">MYR</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="form-grid">
@@ -208,8 +217,14 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
         <input type="number" id="sc-amount" placeholder="e.g. 80" step="any" min="0"/>
       </div>
       <div class="field">
-        <label>Current price (USD) — optional</label>
-        <input type="number" id="sc-current" placeholder="e.g. 5.61" step="any" min="0"/>
+        <label id="sc-cur-label">Current price (USD) — optional</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="sc-current" placeholder="e.g. 5.61" step="any" min="0" style="flex:1"/>
+          <div class="cur-toggle">
+            <button class="cur-btn active" id="sc-cur-usd" onclick="scCurCur('usd')">USD</button>
+            <button class="cur-btn" id="sc-cur-myr" onclick="scCurCur('myr')">MYR</button>
+          </div>
+        </div>
       </div>
     </div>
     <div style="margin-bottom:16px">
@@ -278,12 +293,24 @@ footer{text-align:center;padding:2rem;font-size:11px;color:var(--text3);font-fam
     </div>
     <div class="form-grid">
       <div class="field">
-        <label>Avg buy price (USD)</label>
-        <input type="number" id="pt-buy" placeholder="e.g. 4.50" step="any" min="0"/>
+        <label id="pt-buy-label">Avg buy price (USD)</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="pt-buy" placeholder="e.g. 4.50" step="any" min="0" style="flex:1"/>
+          <div class="cur-toggle">
+            <button class="cur-btn active" id="pt-buy-usd" onclick="ptBuyCur('usd')">USD</button>
+            <button class="cur-btn" id="pt-buy-myr" onclick="ptBuyCur('myr')">MYR</button>
+          </div>
+        </div>
       </div>
       <div class="field">
-        <label>Current price (USD)</label>
-        <input type="number" id="pt-current" placeholder="e.g. 5.61" step="any" min="0"/>
+        <label id="pt-cur-label">Current price (USD)</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="pt-current" placeholder="e.g. 5.61" step="any" min="0" style="flex:1"/>
+          <div class="cur-toggle">
+            <button class="cur-btn active" id="pt-cur-usd" onclick="ptCurCur('usd')">USD</button>
+            <button class="cur-btn" id="pt-cur-myr" onclick="ptCurCur('myr')">MYR</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="form-grid">
@@ -413,11 +440,13 @@ function pct(n){return(n>=0?'+':'')+((n)*100).toFixed(1)+'%'}
 
 function calcSwing(){
   const ticker=document.getElementById('sc-crypto').value;
-  const buy=parseFloat(document.getElementById('sc-buy').value);
+  const buyRaw=parseFloat(document.getElementById('sc-buy').value);
   const amtRM=parseFloat(document.getElementById('sc-amount').value);
-  const curr=parseFloat(document.getElementById('sc-current').value)||null;
-  if(!buy||buy<=0||!amtRM||amtRM<=0){alert('Please enter a valid buy price and amount.');return}
+  const currRaw=parseFloat(document.getElementById('sc-current').value)||null;
+  if(!buyRaw||buyRaw<=0||!amtRM||amtRM<=0){alert('Please enter a valid buy price and amount.');return}
   const r=USDMYR(),p=scProfiles[ticker],si=scSI[scStyle];
+  const buy=toUSD(buyRaw,scBuyCurrency);
+  const curr=currRaw?toUSD(currRaw,scCurCurrency):null;
   const buyMYR=buy*r,tokens=amtRM/buyMYR;
   const sellP=buy*p.sellM[si],rebuyP=buy*p.rebuyM[si],stopP=buy*p.stopM;
   const sellMYR=sellP*r,rebuyMYR=rebuyP*r,stopMYR=stopP*r;
@@ -475,8 +504,10 @@ async function addHolding(){
   const tickerInput=document.getElementById('pt-ticker').value.trim().toUpperCase();
   const ticker=crypto==='OTHER'?(tickerInput||'???'):crypto;
   const tokens=parseFloat(document.getElementById('pt-tokens').value);
-  const buy=parseFloat(document.getElementById('pt-buy').value);
-  const current=parseFloat(document.getElementById('pt-current').value);
+  const buyRaw=parseFloat(document.getElementById('pt-buy').value);
+  const currentRaw=parseFloat(document.getElementById('pt-current').value);
+  const buy=toUSD(buyRaw,ptBuyCurrency);
+  const current=toUSD(currentRaw,ptCurCurrency);
   const note=document.getElementById('pt-note').value.trim();
   if(!tokens||tokens<=0||!buy||buy<=0||!current||current<=0){alert('Please fill in tokens, buy price, and current price.');return}
   const btn=document.getElementById('add-btn');
@@ -551,6 +582,42 @@ async function refreshPortfolio(){
     document.getElementById('pt-rows').innerHTML=rows.join('');
     document.getElementById('pt-footer-total').textContent=fmtRM(totalVal);
   }
+}
+
+
+// Currency toggle state
+let scBuyCurrency='usd', scCurCurrency='usd', ptBuyCurrency='usd', ptCurCurrency='usd';
+
+function toUSD(val, currency) {
+  return currency === 'myr' ? val / USDMYR() : val;
+}
+function scBuyCur(c) {
+  scBuyCurrency = c;
+  document.getElementById('sc-buy-usd').classList.toggle('active', c==='usd');
+  document.getElementById('sc-buy-myr').classList.toggle('active', c==='myr');
+  document.getElementById('sc-buy-label').textContent = c==='usd' ? 'Buy price (USD)' : 'Buy price (MYR)';
+  document.getElementById('sc-buy').placeholder = c==='usd' ? 'e.g. 4.50' : 'e.g. 20.00';
+}
+function scCurCur(c) {
+  scCurCurrency = c;
+  document.getElementById('sc-cur-usd').classList.toggle('active', c==='usd');
+  document.getElementById('sc-cur-myr').classList.toggle('active', c==='myr');
+  document.getElementById('sc-cur-label').textContent = c==='usd' ? 'Current price (USD) — optional' : 'Current price (MYR) — optional';
+  document.getElementById('sc-current').placeholder = c==='usd' ? 'e.g. 5.61' : 'e.g. 24.90';
+}
+function ptBuyCur(c) {
+  ptBuyCurrency = c;
+  document.getElementById('pt-buy-usd').classList.toggle('active', c==='usd');
+  document.getElementById('pt-buy-myr').classList.toggle('active', c==='myr');
+  document.getElementById('pt-buy-label').textContent = c==='usd' ? 'Avg buy price (USD)' : 'Avg buy price (MYR)';
+  document.getElementById('pt-buy').placeholder = c==='usd' ? 'e.g. 4.50' : 'e.g. 20.00';
+}
+function ptCurCur(c) {
+  ptCurCurrency = c;
+  document.getElementById('pt-cur-usd').classList.toggle('active', c==='usd');
+  document.getElementById('pt-cur-myr').classList.toggle('active', c==='myr');
+  document.getElementById('pt-cur-label').textContent = c==='usd' ? 'Current price (USD)' : 'Current price (MYR)';
+  document.getElementById('pt-current').placeholder = c==='usd' ? 'e.g. 5.61' : 'e.g. 24.90';
 }
 
 // Init
